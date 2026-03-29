@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+.venv/
+venv/
+env/
+ENV/
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local configuration and secrets
+config.yaml
+*.bak
+.env
+
+# User data (personal content, never commit)
+data/
+logs/
+user_profile.md
+
+# KingdomOS / AI-tool run artifacts
+RUN_SUMMARY.md
+GEMINI.md
+storage/
+
+# OS
+.DS_Store
+Thumbs.db

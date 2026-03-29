@@ -1,0 +1,18 @@
+openai_api_key: ""          # Or use OPENAI_API_KEY env var
+telegram_bot_token: ""      # Or use TELEGRAM_BOT_TOKEN env var
+telegram_user_id: 0         # Your numerical Telegram user ID. Or use TELEGRAM_USER_ID env var
+model_name: "gpt-4.1-mini"  # Or use MODEL_NAME env var
+max_summary_sentences: 5
+data_dir: "data"            # Or use DATA_DIR env var (e.g. /data for a Railway volume)
+log_level: "INFO"           # Or use LOG_LEVEL env var
+
+# Categories used for link classification.
+# Edit freely — these are passed to the LLM as the allowed output values.
+categories:
+  - "ML General"
+  - "AI Training & Fine-tuning"
+  - "Research & Papers"
+  - "AI Tools & Open Source"
+  - "Hardware & Computing"
+  - "Personal Productivity"
+  - "Uncategorized"
