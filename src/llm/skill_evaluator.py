@@ -61,8 +61,8 @@ class SkillEvaluator(LLMBase):
                 system_prompt_template_path=str(_PROJECT_ROOT / "prompts" / "skill_evaluator_system.md"),
             )
             parsed = _parse_json_response(raw)
-        except Exception as e:
-            logger.error("Skill evaluator error, skipping artifact generation: %s", e)
+        except Exception:
+            logger.exception("Skill evaluator error, skipping artifact generation.")
             return SkillEvaluationResult(
                 worth_creating=False,
                 reasoning="Skill evaluation failed, so artifact generation was skipped.",

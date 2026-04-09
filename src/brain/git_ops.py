@@ -47,6 +47,13 @@ class BrainGitOps:
     def commit_brain(self, message: str) -> CommitResult:
         """Stage and commit all brain changes."""
         try:
+            removed_paths = sanitize_brain_repo_contents(self.brain_dir)
+            if removed_paths:
+                logger.info(
+                    "Removed %d unexpected path(s) before commit: %s",
+                    len(removed_paths),
+                    ", ".join(sorted(removed_paths)),
+                )
             if not self.has_changes():
                 return CommitResult(success=False, error="No changes to commit.")
             self.stage_brain()

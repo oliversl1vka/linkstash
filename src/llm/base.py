@@ -31,7 +31,8 @@ class LLMBase:
                 raise KeyError(key)
             return str(context[key])
 
-        return re.sub(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}", replace_placeholder, template)
+        result = re.sub(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}", replace_placeholder, template)
+        return result.replace("{{", "{").replace("}}", "}")
         
     async def generate_response(
         self,
