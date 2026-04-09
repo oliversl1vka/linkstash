@@ -129,14 +129,15 @@ class SkillWriter:
         existing_relative_path: str = "",
     ) -> WrittenArtifact:
         self.ensure_structure()
-        target_path = self._resolve_main_path(artifact_type, domain_path, name, existing_relative_path)
+        canonical_name = _canonical_artifact_name(name, content, artifact_type)
+        target_path = self._resolve_main_path(artifact_type, domain_path, canonical_name, existing_relative_path)
         target_path.parent.mkdir(parents=True, exist_ok=True)
         was_existing = target_path.exists()
         existing_metadata = _parse_frontmatter(target_path) if target_path.exists() else {}
 
         merged_source_urls = _merge_source_urls(existing_metadata.get("source_urls", []), source_url)
         metadata = {
-            "name": name,
+            "name": canonical_name,
             "description": description,
         }
         if artifact_type != "skill":
@@ -161,7 +162,7 @@ class SkillWriter:
         logger.info("Claude artifact %s: %s", action, relative_path)
         return WrittenArtifact(
             artifact_type=artifact_type,
-            name=name,
+            name=canonical_name,
             relative_path=relative_path,
             path=target_path,
             action=action,
@@ -218,6 +219,38 @@ def _derive_path_parts(root: Path, md_file: Path, artifact_type: str) -> tuple[s
         return domain_path, name
     domain_path = "/".join(parts[1:-1])
     return domain_path, md_file.stem
+
+
+def _canonical_artifact_name(name: str, content: str, artifact_type: str) -> str:
+    explicit_name = _slugify_text(name)
+    heading_name = _slugify_text(_extract_h1_heading(content))
+
+    if artifact_type != "skill" and heading_name:
+        return heading_name
+    return explicit_name or heading_name
+
+
+def _extract_h1_heading(content: str) -> str:
+    body = content.strip()
+    if body.startswith("---\n"):
+        _, _, remainder = body.partition("---\n")
+        _, separator, body_after = remainder.partition("\n---\n")
+        if separator:
+            body = body_after.strip()
+
+    for line in body.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("# "):
+            return stripped[2:].strip()
+    return ""
+
+
+def _slugify_text(text: str) -> str:
+    text = text.lower().strip()
+    text = re.sub(r"[^a-z0-9\s-]", "", text)
+    text = re.sub(r"[\s_]+", "-", text)
+    text = re.sub(r"-+", "-", text)
+    return text.strip("-")[:64]
 
 
 def _parse_frontmatter(path: Path) -> dict:

@@ -127,6 +127,34 @@ def test_skill_writer_indexes_and_shortlists_relevant_entries(brain_test_dir: Pa
     assert (settings.skills_dir / "skills" / "development" / "testing" / "browser-regression-testing" / "references" / "playwright-notes.md").exists()
 
 
+def test_skill_writer_uses_heading_slug_for_instruction_filename(brain_test_dir: Path):
+    writer = SkillWriter()
+
+    written = writer.write_artifact(
+        artifact_type="instruction",
+        name="mintlify-platform-etup-and-integration",
+        description="Setup and integration guidance for Mintlify.",
+        domain_path="development/productivity",
+        content=(
+            "---\n"
+            "name: mintlify-platform-etup-and-integration\n"
+            "description: Setup and integration guidance for Mintlify.\n"
+            "type: instruction\n"
+            "---\n\n"
+            "# Mintlify Platform Setup and Integration\n\n"
+            "## Workflow\n"
+            "1. Connect Mintlify.\n"
+        ),
+        source_url="https://github.com/mintlify",
+    )
+
+    assert written.name == "mintlify-platform-setup-and-integration"
+    assert written.relative_path == "instructions/development/productivity/mintlify-platform-setup-and-integration.md"
+    assert written.path.exists()
+    content = written.path.read_text(encoding="utf-8")
+    assert "name: mintlify-platform-setup-and-integration" in content
+
+
 def test_brain_git_ops_uses_configured_brain_repo(brain_test_dir: Path):
     repo = Repo.init(brain_test_dir)
     with repo.config_writer() as config_writer:
