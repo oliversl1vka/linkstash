@@ -9,6 +9,7 @@ from pathlib import Path
 from src.brain.skill_writer import SkillManifestEntry
 from src.llm.base import LLMBase
 from src.pipeline import PipelineResult
+from src.utils.text import slugify
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 logger = logging.getLogger(__name__)
@@ -126,7 +127,7 @@ class SkillEvaluator(LLMBase):
                 merge_reasoning="",
             )
 
-        name = _slugify(str(parsed.get("name", "")).strip())
+        name = slugify(str(parsed.get("name", "")).strip())
         domain_path = _sanitize_domain_path(str(parsed.get("domain_path", "")).strip())
         description = " ".join(str(parsed.get("description", "")).strip().split())
         if not name or not domain_path or not description:
@@ -177,18 +178,10 @@ def _parse_json_response(text: str) -> dict:
     return json.loads(text.strip())
 
 
-def _slugify(text: str) -> str:
-    text = text.lower().strip()
-    text = re.sub(r"[^a-z0-9\\s-]", "", text)
-    text = re.sub(r"[\\s_]+", "-", text)
-    text = re.sub(r"-+", "-", text)
-    return text.strip("-")[:64]
-
-
 def _sanitize_domain_path(text: str) -> str:
     parts = []
     for part in text.split("/"):
-        slug = _slugify(part)
+        slug = slugify(part)
         if slug:
             parts.append(slug)
     return "/".join(parts)
