@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 import yaml
 
 from src.config import settings
+from src.utils.text import slugify
 
 if TYPE_CHECKING:
     from src.llm.skill_formatter import ReferenceFile
@@ -222,35 +223,31 @@ def _derive_path_parts(root: Path, md_file: Path, artifact_type: str) -> tuple[s
 
 
 def _canonical_artifact_name(name: str, content: str, artifact_type: str) -> str:
-    explicit_name = _slugify_text(name)
-    heading_name = _slugify_text(_extract_h1_heading(content))
+    explicit_name = slugify(name)
+    heading_name = slugify(_extract_h1_heading(content))
 
     if artifact_type != "skill" and heading_name:
         return heading_name
     return explicit_name or heading_name
 
 
-def _extract_h1_heading(content: str) -> str:
+def _strip_frontmatter_body(content: str) -> str:
     body = content.strip()
     if body.startswith("---\n"):
         _, _, remainder = body.partition("---\n")
         _, separator, body_after = remainder.partition("\n---\n")
         if separator:
-            body = body_after.strip()
+            return body_after.strip()
+    return body
 
+
+def _extract_h1_heading(content: str) -> str:
+    body = _strip_frontmatter_body(content)
     for line in body.splitlines():
         stripped = line.strip()
         if stripped.startswith("# "):
             return stripped[2:].strip()
     return ""
-
-
-def _slugify_text(text: str) -> str:
-    text = text.lower().strip()
-    text = re.sub(r"[^a-z0-9\s-]", "", text)
-    text = re.sub(r"[\s_]+", "-", text)
-    text = re.sub(r"-+", "-", text)
-    return text.strip("-")[:64]
 
 
 def _parse_frontmatter(path: Path) -> dict:
@@ -268,13 +265,7 @@ def _parse_frontmatter(path: Path) -> dict:
 
 
 def _with_frontmatter(content: str, metadata: dict) -> str:
-    body = content.strip()
-    existing_body = body
-    if body.startswith("---\n"):
-        _, _, remainder = body.partition("---\n")
-        _, separator, body_after = remainder.partition("\n---\n")
-        if separator:
-            existing_body = body_after.strip()
+    existing_body = _strip_frontmatter_body(content)
     frontmatter = yaml.safe_dump(metadata, sort_keys=False, allow_unicode=True).strip()
     return f"---\n{frontmatter}\n---\n\n{existing_body}\n"
 

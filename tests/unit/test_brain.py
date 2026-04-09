@@ -127,19 +127,26 @@ def test_skill_writer_indexes_and_shortlists_relevant_entries(brain_test_dir: Pa
     assert (settings.skills_dir / "skills" / "development" / "testing" / "browser-regression-testing" / "references" / "playwright-notes.md").exists()
 
 
-def test_skill_writer_uses_heading_slug_for_instruction_filename(brain_test_dir: Path):
+@pytest.mark.parametrize("artifact_type,type_dir", [
+    ("instruction", "instructions"),
+    ("prompt", "prompts"),
+    ("agent", "agents"),
+])
+def test_skill_writer_uses_heading_slug_for_artifact_filename(
+    brain_test_dir: Path, artifact_type: str, type_dir: str
+):
     writer = SkillWriter()
 
     written = writer.write_artifact(
-        artifact_type="instruction",
+        artifact_type=artifact_type,
         name="mintlify-platform-etup-and-integration",
         description="Setup and integration guidance for Mintlify.",
         domain_path="development/productivity",
         content=(
             "---\n"
-            "name: mintlify-platform-etup-and-integration\n"
+            f"name: mintlify-platform-etup-and-integration\n"
             "description: Setup and integration guidance for Mintlify.\n"
-            "type: instruction\n"
+            f"type: {artifact_type}\n"
             "---\n\n"
             "# Mintlify Platform Setup and Integration\n\n"
             "## Workflow\n"
@@ -149,7 +156,7 @@ def test_skill_writer_uses_heading_slug_for_instruction_filename(brain_test_dir:
     )
 
     assert written.name == "mintlify-platform-setup-and-integration"
-    assert written.relative_path == "instructions/development/productivity/mintlify-platform-setup-and-integration.md"
+    assert written.relative_path == f"{type_dir}/development/productivity/mintlify-platform-setup-and-integration.md"
     assert written.path.exists()
     content = written.path.read_text(encoding="utf-8")
     assert "name: mintlify-platform-setup-and-integration" in content
