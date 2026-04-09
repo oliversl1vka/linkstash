@@ -1,4 +1,5 @@
 import base64
+import builtins
 
 import httpx
 import pytest
@@ -96,6 +97,33 @@ class FakeAsyncClient:
     async def get(self, url: str):
         self.calls.append(url)
         return self.responses[url]
+
+
+class FakeBinaryResponse:
+    def __init__(self, url: str, content: bytes, status_code: int = 200):
+        self.url = url
+        self.content = content
+        self.status_code = status_code
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            request = httpx.Request("GET", self.url)
+            response = httpx.Response(self.status_code, request=request)
+            raise httpx.HTTPStatusError(f"HTTP {self.status_code}", request=request, response=response)
+
+
+class FakeBinaryAsyncClient:
+    def __init__(self, response: FakeBinaryResponse, **kwargs):
+        self.response = response
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    async def get(self, url: str):
+        return self.response
 
 
 def _inject_base64_line_break(content: str, position: int = 4) -> str:
@@ -292,3 +320,26 @@ async def test_unsupported_format_scraper():
     result = await scraper.scrape("https://example.com/file.pdf")
     assert result.status == "failed"
     assert "Unsupported" in result.error_reason
+
+
+@pytest.mark.asyncio
+async def test_pdf_scraper_requires_pypdf(monkeypatch: pytest.MonkeyPatch):
+    scraper = PdfScraper()
+    response = FakeBinaryResponse("https://example.com/paper.pdf", b"%PDF-1.4\n")
+    real_import = builtins.__import__
+
+    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "pypdf":
+            raise ImportError("missing pypdf")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(
+        "src.scrapers.pdf.httpx.AsyncClient",
+        lambda **kwargs: FakeBinaryAsyncClient(response, **kwargs),
+    )
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+
+    result = await scraper.scrape("https://example.com/paper.pdf")
+
+    assert result.status == "failed"
+    assert result.error_reason == "pypdf not installed — cannot extract PDF text"

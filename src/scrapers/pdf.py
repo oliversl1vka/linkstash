@@ -18,11 +18,7 @@ class PdfScraper(BaseScraper):
                 import pypdf
                 reader = pypdf.PdfReader(io.BytesIO(response.content))
             except ImportError:
-                try:
-                    import PyPDF2 as pypdf2_mod
-                    reader = pypdf2_mod.PdfReader(io.BytesIO(response.content))
-                except ImportError:
-                    return self._create_failed_result(url, "pypdf/PyPDF2 not installed — cannot extract PDF text")
+                return self._create_failed_result(url, "pypdf not installed — cannot extract PDF text")
 
             pages = []
             for page in reader.pages[:20]:
