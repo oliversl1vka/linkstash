@@ -29,15 +29,17 @@ def sanitize_brain_repo_contents(brain_dir: Path) -> list[str]:
     for child in brain_dir.iterdir():
         if child.name == ".git" or child.name in ALLOWED_BRAIN_REPO_PATHS:
             continue
-        if child.is_symlink() or not child.is_dir():
+        if child.is_symlink():
             child.unlink()
-        else:
+        elif child.is_dir():
             for nested in sorted(child.rglob("*"), reverse=True):
                 if nested.is_symlink() or nested.is_file():
                     nested.unlink()
                 elif nested.is_dir():
                     nested.rmdir()
             child.rmdir()
+        else:
+            child.unlink()
         removed_paths.append(child.name)
 
     return removed_paths
