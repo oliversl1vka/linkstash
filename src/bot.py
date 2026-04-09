@@ -77,7 +77,14 @@ def _count_pending_brain_changes(status_lines: list[str]) -> tuple[int, int]:
             continue
         if "/references/" in path or "_references/" in path:
             continue
-        if path.endswith("/SKILL.md") or path.endswith(".md"):
+        if path.startswith("Claude-Code/skills/"):
+            if path.endswith("/SKILL.md"):
+                claude_artifacts += 1
+        elif (
+            path.startswith("Claude-Code/instructions/")
+            or path.startswith("Claude-Code/prompts/")
+            or path.startswith("Claude-Code/agents/")
+        ) and path.endswith(".md"):
             claude_artifacts += 1
 
     return new_entries, claude_artifacts
