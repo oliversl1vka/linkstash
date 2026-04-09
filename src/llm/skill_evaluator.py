@@ -53,13 +53,28 @@ class SkillEvaluator(LLMBase):
             "existing_artifacts": candidates_text,
         }
 
-        raw = await self.generate_response(
-            str(_PROJECT_ROOT / "prompts" / "evaluate_skill.md"),
-            context,
-            max_tokens=700,
-            system_prompt_template_path=str(_PROJECT_ROOT / "prompts" / "skill_evaluator_system.md"),
-        )
-        parsed = _parse_json_response(raw)
+        try:
+            raw = await self.generate_response(
+                str(_PROJECT_ROOT / "prompts" / "evaluate_skill.md"),
+                context,
+                max_tokens=700,
+                system_prompt_template_path=str(_PROJECT_ROOT / "prompts" / "skill_evaluator_system.md"),
+            )
+            parsed = _parse_json_response(raw)
+        except Exception as e:
+            logger.error("Skill evaluator error, skipping artifact generation: %s", e)
+            return SkillEvaluationResult(
+                worth_creating=False,
+                reasoning="Skill evaluation failed, so artifact generation was skipped.",
+                artifact_type="none",
+                name="",
+                description="",
+                domain_path="",
+                action="skip",
+                existing_path="",
+                merge_reasoning="",
+            )
+
         artifact_type = str(parsed.get("artifact_type", "none")).strip().lower()
         action = str(parsed.get("action", "skip")).strip().lower()
         existing_path = str(parsed.get("existing_path", "")).strip()

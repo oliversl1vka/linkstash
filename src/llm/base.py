@@ -1,8 +1,11 @@
-from openai import AsyncOpenAI, APITimeoutError
 import asyncio
+import logging
+import re
+
+from openai import APITimeoutError, AsyncOpenAI
+
 from src.config import settings
 from src.utils.logging import log_api_call
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +24,14 @@ class LLMBase:
 
         if context is None:
             return template
-        return template.format(**context)
+
+        def replace_placeholder(match: re.Match[str]) -> str:
+            key = match.group(1)
+            if key not in context:
+                raise KeyError(key)
+            return str(context[key])
+
+        return re.sub(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}", replace_placeholder, template)
         
     async def generate_response(
         self,

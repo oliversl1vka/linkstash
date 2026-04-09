@@ -12,7 +12,7 @@ Returns True if the brain pipeline is safe to enable, False otherwise.
 import logging
 import os
 
-from src.brain.git_utils import sanitize_git_error_message
+from src.brain.git_utils import sanitize_brain_repo_contents, sanitize_git_error_message
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -103,5 +103,13 @@ def bootstrap_brain_git() -> bool:
                 "Initial git pull failed (continuing anyway): %s",
                 sanitize_git_error_message(e),
             )
+
+    removed_paths = sanitize_brain_repo_contents(brain_dir)
+    if removed_paths:
+        logger.info(
+            "Removed %d unexpected path(s) from brain repo: %s",
+            len(removed_paths),
+            ", ".join(sorted(removed_paths)),
+        )
 
     return True

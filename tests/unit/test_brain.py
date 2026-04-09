@@ -173,3 +173,46 @@ def test_bootstrap_brain_git_configures_separate_private_remote(
 
     repo = Repo(brain_test_dir)
     assert repo.remotes.origin.url == "https://x-access-token:ghp_testtoken@github.com/example/private-brain.git"
+
+
+def test_bootstrap_brain_git_removes_unexpected_repo_files(
+    brain_test_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    repo = Repo.init(brain_test_dir)
+    with repo.config_writer() as config_writer:
+        config_writer.set_value("user", "email", "test@example.com")
+        config_writer.set_value("user", "name", "Test User")
+
+    (brain_test_dir / "README.md").write_text("should not live here\n", encoding="utf-8")
+    repo.git.add("README.md")
+    repo.index.commit("seed unexpected file")
+
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.delenv("GIT_REPO_SLUG", raising=False)
+
+    assert bootstrap_brain_git() is True
+    assert not (brain_test_dir / "README.md").exists()
+
+
+def test_brain_git_ops_commit_removes_unexpected_repo_files(brain_test_dir: Path):
+    repo = Repo.init(brain_test_dir)
+    with repo.config_writer() as config_writer:
+        config_writer.set_value("user", "email", "test@example.com")
+        config_writer.set_value("user", "name", "Test User")
+
+    entries_dir = brain_test_dir / "Entries"
+    entries_dir.mkdir(parents=True, exist_ok=True)
+    (entries_dir / "2026-04-08-entry.md").write_text("# Entry\n", encoding="utf-8")
+    (brain_test_dir / "README.md").write_text("should be removed\n", encoding="utf-8")
+    repo.git.add("Entries/2026-04-08-entry.md", "README.md")
+    repo.index.commit("seed repo")
+
+    (entries_dir / "2026-04-09-entry.md").write_text("# New Entry\n", encoding="utf-8")
+
+    ops = BrainGitOps()
+    result = ops.commit_brain("brain: keep only allowed files")
+
+    assert result.success is True
+    assert not (brain_test_dir / "README.md").exists()
+    assert "README.md" not in ops.repo.git.ls_files()

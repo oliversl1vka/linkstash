@@ -2,7 +2,7 @@ import logging
 import shutil
 from dataclasses import dataclass
 
-from src.brain.git_utils import sanitize_git_error_message
+from src.brain.git_utils import sanitize_brain_repo_contents, sanitize_git_error_message
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -35,6 +35,13 @@ class BrainGitOps:
 
     def stage_brain(self) -> None:
         """Stage all changes in the configured brain repo."""
+        removed_paths = sanitize_brain_repo_contents(self.brain_dir)
+        if removed_paths:
+            logger.info(
+                "Removed %d unexpected path(s) before staging brain repo: %s",
+                len(removed_paths),
+                ", ".join(sorted(removed_paths)),
+            )
         self.repo.git.add("--all")
 
     def commit_brain(self, message: str) -> CommitResult:

@@ -1,7 +1,12 @@
 import pytest
+from pathlib import Path
+
+from src.llm.base import LLMBase
 from src.llm.evaluator import Evaluator
 from src.llm.summarizer import Summarizer
 from src.llm.categorizer import Categorizer
+from src.llm.skill_evaluator import SkillEvaluator
+from src.pipeline import PipelineResult
 
 # --- Mock subclasses that override generate_response to avoid real API calls ---
 
@@ -27,6 +32,19 @@ class MockCategorizer(Categorizer):
 class MockCategorizerWithQuotes(Categorizer):
     async def generate_response(self, prompt_template_path: str, context: dict, max_tokens: int = 500) -> str:
         return '"AI Tools & Open Source"'
+
+
+class TemplateOnlyLLM(LLMBase):
+    def __init__(self):
+        pass
+
+
+class FailingSkillEvaluator(SkillEvaluator):
+    def __init__(self):
+        pass
+
+    async def generate_response(self, prompt_template_path: str, context: dict, max_tokens: int = 500, system_prompt_template_path: str | None = None, system_context: dict | None = None) -> str:
+        raise RuntimeError("template failure")
 
 
 # --- Evaluator Tests ---
@@ -91,3 +109,38 @@ async def test_categorizer_strips_outer_quotes():
     categorizer = MockCategorizerWithQuotes()
     result = await categorizer.categorize("Some summary")
     assert result == "AI Tools & Open Source"
+
+
+def test_load_template_leaves_json_braces_intact(tmp_path: Path):
+    template_path = tmp_path / "prompt.md"
+    template_path.write_text(
+        "Title: {title}\nExample: {\"worth_creating\": true, \"name\": \"demo\"}\n",
+        encoding="utf-8",
+    )
+
+    rendered = TemplateOnlyLLM()._load_template(str(template_path), {"title": "Demo"})
+
+    assert "Title: Demo" in rendered
+    assert '{"worth_creating": true, "name": "demo"}' in rendered
+
+
+@pytest.mark.asyncio
+async def test_skill_evaluator_returns_skip_when_generation_fails(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("USER_PROFILE", "Test profile")
+    evaluator = FailingSkillEvaluator()
+
+    result = await evaluator.evaluate_skill(
+        PipelineResult(
+            url="https://example.com/tool",
+            title="Example Tool",
+            summary="Useful workflow",
+            category="AI Tools & Open Source",
+            status="success",
+            notify=False,
+            scrape_content="Important reusable details",
+        ),
+        [],
+    )
+
+    assert result.worth_creating is False
+    assert result.action == "skip"
