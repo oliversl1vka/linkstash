@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -53,17 +54,34 @@ class SkillEvaluator(LLMBase):
             "existing_artifacts": candidates_text,
         }
 
-        raw = await self.generate_response(
-            str(_PROJECT_ROOT / "prompts" / "evaluate_skill.md"),
-            context,
-            max_tokens=700,
-            system_prompt_template_path=str(_PROJECT_ROOT / "prompts" / "skill_evaluator_system.md"),
-        )
+        try:
+            raw = await self.generate_response(
+                str(_PROJECT_ROOT / "prompts" / "evaluate_skill.md"),
+                context,
+                max_tokens=700,
+                system_prompt_template_path=str(_PROJECT_ROOT / "prompts" / "skill_evaluator_system.md"),
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Skill evaluator request failed; skipping artifact generation.")
+            return SkillEvaluationResult(
+                worth_creating=False,
+                reasoning="Skill evaluation failed, so artifact generation was skipped.",
+                artifact_type="none",
+                name="",
+                description="",
+                domain_path="",
+                action="skip",
+                existing_path="",
+                merge_reasoning="",
+            )
+
         try:
             parsed = _parse_json_response(raw)
             if not isinstance(parsed, dict):
                 raise TypeError("Skill evaluator response parsed to non-dict type.")
-        except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+        except (json.JSONDecodeError, TypeError, ValueError) as exc:
             logger.warning(
                 "Skill evaluator returned malformed JSON payload; skipping artifact generation: %s",
                 exc,
@@ -79,6 +97,7 @@ class SkillEvaluator(LLMBase):
                 existing_path="",
                 merge_reasoning="",
             )
+
         artifact_type = str(parsed.get("artifact_type", "none")).strip().lower()
         action = str(parsed.get("action", "skip")).strip().lower()
         existing_path = str(parsed.get("existing_path", "")).strip()
