@@ -29,6 +29,9 @@ Return ONLY valid JSON with exactly these fields:
 
 Rules:
 - If the source is not durable, actionable, and reusable for Claude Code work, set `worth_creating=false`, `artifact_type="none"`, and `action="skip"`.
+- For GitHub repositories, `instruction` is appropriate when the source captures durable setup, integration, architecture, or repo-convention guidance that would help you use or adopt the repo in a future project.
+- Prefer one strong artifact over multiple weak ones.
+- Skip repositories that are only high-level product overviews without concrete implementation guidance.
 - Only use `existing_path` values that appear in the relevant existing artifacts list above.
 - If the source overlaps an existing artifact but adds no meaningful new information, choose `skip`.
 - If the source overlaps an existing artifact and adds concrete new value, choose `merge`.

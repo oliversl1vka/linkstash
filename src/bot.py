@@ -53,6 +53,36 @@ class KnowledgeWriteResult:
     skill_result: "SkillPipelineResult | None" = None
 
 
+def _extract_status_paths(status_lines: list[str]) -> list[str]:
+    paths: list[str] = []
+    for line in status_lines:
+        if len(line) < 4:
+            continue
+        path = line[3:]
+        if " -> " in path:
+            path = path.split(" -> ", maxsplit=1)[1]
+        paths.append(path)
+    return paths
+
+
+def _count_pending_brain_changes(status_lines: list[str]) -> tuple[int, int]:
+    paths = _extract_status_paths(status_lines)
+    new_entries = sum(1 for path in paths if path.startswith("Entries/") and path.endswith(".md"))
+
+    claude_artifacts = 0
+    for path in paths:
+        if not path.startswith("Claude-Code/"):
+            continue
+        if path == "Claude-Code/index.md":
+            continue
+        if "/references/" in path or "_references/" in path:
+            continue
+        if path.endswith("/SKILL.md") or path.endswith(".md"):
+            claude_artifacts += 1
+
+    return new_entries, claude_artifacts
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a message when the command /start is issued."""
     if update.effective_user.id != settings.telegram_user_id:
@@ -211,9 +241,8 @@ async def brain_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             # Build commit message from new files count
             from git import Repo
             repo = Repo(settings.brain_dir)
-            status_lines = repo.git.status("--porcelain").splitlines()
-            new_entries = sum(1 for line in status_lines if line[3:].startswith("Entries/"))
-            claude_artifacts = sum(1 for line in status_lines if line[3:].startswith("Claude-Code/"))
+            status_lines = repo.git.status("--porcelain", "--untracked-files=all").splitlines()
+            new_entries, claude_artifacts = _count_pending_brain_changes(status_lines)
             commit_msg = f"brain: sync {new_entries} entries"
             if claude_artifacts:
                 commit_msg += f" and {claude_artifacts} Claude artifacts"
