@@ -114,7 +114,7 @@ async def test_categorizer_strips_outer_quotes():
 def test_load_template_leaves_json_braces_intact(tmp_path: Path):
     template_path = tmp_path / "prompt.md"
     template_path.write_text(
-        "Title: {title}\nExample: {\"worth_creating\": true, \"name\": \"demo\"}\n",
+        'Title: {title}\nExample: {{"worth_creating": true, "name": "demo"}}\n',
         encoding="utf-8",
     )
 
@@ -122,6 +122,18 @@ def test_load_template_leaves_json_braces_intact(tmp_path: Path):
 
     assert "Title: Demo" in rendered
     assert '{"worth_creating": true, "name": "demo"}' in rendered
+
+
+def test_load_template_does_not_unescape_braces_in_context_values(tmp_path: Path):
+    """Double-braces inside a *substituted context value* must not be unescaped."""
+    template_path = tmp_path / "prompt.md"
+    template_path.write_text("Content: {content}\n", encoding="utf-8")
+
+    rendered = TemplateOnlyLLM()._load_template(
+        str(template_path), {"content": "{{not a placeholder}}"}
+    )
+
+    assert "{{not a placeholder}}" in rendered
 
 
 @pytest.mark.asyncio

@@ -1,5 +1,6 @@
 from pathlib import Path
 import re
+import shutil
 
 
 ALLOWED_BRAIN_REPO_PATHS = {
@@ -32,12 +33,7 @@ def sanitize_brain_repo_contents(brain_dir: Path) -> list[str]:
         if child.is_symlink():
             child.unlink()
         elif child.is_dir():
-            for nested in sorted(child.rglob("*"), reverse=True):
-                if nested.is_symlink() or nested.is_file():
-                    nested.unlink()
-                elif nested.is_dir():
-                    nested.rmdir()
-            child.rmdir()
+            shutil.rmtree(child)
         else:
             child.unlink()
         removed_paths.append(child.name)

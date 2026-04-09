@@ -25,6 +25,13 @@ class LLMBase:
         if context is None:
             return template
 
+        # Protect escaped braces in the *template* before substitution so that
+        # {{ / }} in the template are treated as literal braces, while {{ / }}
+        # that appear in substituted context values are left untouched.
+        _LBRACE = "\x00LBRACE\x00"
+        _RBRACE = "\x00RBRACE\x00"
+        template = template.replace("{{", _LBRACE).replace("}}", _RBRACE)
+
         def replace_placeholder(match: re.Match[str]) -> str:
             key = match.group(1)
             if key not in context:
@@ -32,7 +39,7 @@ class LLMBase:
             return str(context[key])
 
         result = re.sub(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}", replace_placeholder, template)
-        return result.replace("{{", "{").replace("}}", "}")
+        return result.replace(_LBRACE, "{").replace(_RBRACE, "}")
         
     async def generate_response(
         self,

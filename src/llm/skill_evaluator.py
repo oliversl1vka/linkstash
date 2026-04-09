@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -60,6 +61,8 @@ class SkillEvaluator(LLMBase):
                 max_tokens=700,
                 system_prompt_template_path=str(_PROJECT_ROOT / "prompts" / "skill_evaluator_system.md"),
             )
+        except asyncio.CancelledError:
+            raise
         except Exception:
             logger.exception("Skill evaluator request failed; skipping artifact generation.")
             return SkillEvaluationResult(
