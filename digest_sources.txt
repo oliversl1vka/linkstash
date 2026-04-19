@@ -1,12 +1,14 @@
 # Daily digest sources — one URL per line
 # Lines starting with # are comments and are ignored
 # Add URLs here that you want processed daily
+#
+# Prefix a URL with `index:` to mark it as a listing page. The digest will
+# extract same-host article links from its HTML (up to MAX_ARTICLES_PER_FEED)
+# and process each article individually. Use this for blogs without RSS.
 
 # Examples:
 # https://example.com/interesting-article
 # https://github.com/some/repo
-https://deepmind.google/blog/
-https://openai.com/news/research/
-https://research.google/blog/
-https://machinelearning.apple.com/research?type=article
-https://huggingface.co/blog
+# index: https://claude.com/blog
+
+index: https://claude.com/blog
