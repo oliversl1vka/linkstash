@@ -40,6 +40,11 @@ _INDEX_EXCLUDE_FRAGMENTS = (
     "/author/", "/authors/", "/page/", "/search",
 )
 
+# Cap HTML size inspected when extracting index links. Real blog listings
+# comfortably fit (claude.com/blog ≈ 770 KB); this just prevents pathological
+# pages from pinning memory or running regex over megabytes of markup.
+_MAX_INDEX_HTML_BYTES = 1_000_000
+
 
 def _read_sources() -> list[tuple[str, bool]]:
     """Read URLs from digest_sources_file.
@@ -78,7 +83,7 @@ async def _extract_index_links(url: str) -> list[str]:
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
             resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0 LinkStash/1.0"})
             resp.raise_for_status()
-            html = resp.text
+            html = resp.text[:_MAX_INDEX_HTML_BYTES]
     except Exception as e:
         logger.warning(f"Index fetch failed for {url}: {e}")
         return []
@@ -87,7 +92,7 @@ async def _extract_index_links(url: str) -> list[str]:
     base_path = base.path.rstrip("/") + "/"  # e.g. "/blog/"
     host = base.netloc
 
-    hrefs = re.findall(r'href=["\']([^"\']+)["\']', html)
+    hrefs = re.findall(r'href=["\']([^"\']+)["\']', html, flags=re.IGNORECASE)
     seen: set[str] = set()
     articles: list[str] = []
     for href in hrefs:
