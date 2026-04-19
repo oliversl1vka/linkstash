@@ -34,19 +34,91 @@ _AUTODISCOVER_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Path fragments that indicate a listing/taxonomy page, not an article.
+_INDEX_EXCLUDE_FRAGMENTS = (
+    "/category/", "/categories/", "/tag/", "/tags/",
+    "/author/", "/authors/", "/page/", "/search",
+)
 
-def _read_sources() -> list[str]:
-    """Read URLs from digest_sources_file. Skips blank lines and # comments."""
+# Cap HTML size inspected when extracting index links. Real blog listings
+# comfortably fit (claude.com/blog ≈ 770 KB); this just prevents pathological
+# pages from pinning memory or running regex over megabytes of markup.
+_MAX_INDEX_HTML_BYTES = 1_000_000
+
+
+def _read_sources() -> list[tuple[str, bool]]:
+    """Read URLs from digest_sources_file.
+
+    Returns a list of (url, is_index) tuples. A line prefixed with `index:`
+    marks the URL as a listing page whose article links should be expanded
+    directly from HTML (used when the site has no RSS/Atom feed).
+    Skips blank lines and # comments.
+    """
     sources_path = _PROJECT_ROOT / settings.digest_sources_file
     if not sources_path.exists():
         logger.info(f"Digest sources file not found: {sources_path}")
         return []
-    urls = []
+    entries: list[tuple[str, bool]] = []
     for line in sources_path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
-        if line and not line.startswith("#"):
-            urls.append(line)
-    return urls
+        if not line or line.startswith("#"):
+            continue
+        is_index = False
+        if line.lower().startswith("index:"):
+            is_index = True
+            line = line.split(":", 1)[1].strip()
+        if line:
+            entries.append((line, is_index))
+    return entries
+
+
+async def _extract_index_links(url: str) -> list[str]:
+    """Extract same-host article links from a listing page's HTML.
+
+    Keeps only links whose path starts with the index URL's path, excludes
+    obvious taxonomy pages, and caps the result at MAX_ARTICLES_PER_FEED.
+    """
+    from urllib.parse import urlparse, urljoin
+    try:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+            resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0 LinkStash/1.0"})
+            resp.raise_for_status()
+            html = resp.text[:_MAX_INDEX_HTML_BYTES]
+    except Exception as e:
+        logger.warning(f"Index fetch failed for {url}: {e}")
+        return []
+
+    base = urlparse(url)
+    base_path = base.path.rstrip("/") + "/"  # e.g. "/blog/"
+    host = base.netloc
+
+    hrefs = re.findall(r'href=["\']([^"\']+)["\']', html, flags=re.IGNORECASE)
+    seen: set[str] = set()
+    articles: list[str] = []
+    for href in hrefs:
+        absolute = urljoin(url, href)
+        parsed = urlparse(absolute)
+        if parsed.netloc != host:
+            continue
+        path = parsed.path
+        if not path.startswith(base_path):
+            continue
+        # Must have something *after* the base path (at least one slug segment)
+        if path.rstrip("/") == base_path.rstrip("/"):
+            continue
+        if any(frag in path for frag in _INDEX_EXCLUDE_FRAGMENTS):
+            continue
+        # Strip fragment, keep query (rare for blogs but cheap)
+        clean = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+        if parsed.query:
+            clean += f"?{parsed.query}"
+        if clean in seen:
+            continue
+        seen.add(clean)
+        articles.append(clean)
+        if len(articles) >= MAX_ARTICLES_PER_FEED:
+            break
+    return articles
 
 
 def _parse_feed(url: str) -> list[str]:
@@ -151,8 +223,16 @@ async def run_digest() -> list[PipelineResult]:
     # Expand each source into one or more article URLs (feed-aware)
     all_urls: list[str] = []
     seen: set[str] = set()
-    for src in sources:
-        expanded = await _expand_to_article_urls(src)
+    for src, is_index in sources:
+        if is_index:
+            expanded = await _extract_index_links(src)
+            logger.info(f"Index: {src} → {len(expanded)} article links")
+            if not expanded:
+                # Nothing extracted — don't fall back to the index page itself,
+                # since that produced no useful content by design.
+                continue
+        else:
+            expanded = await _expand_to_article_urls(src)
         for u in expanded:
             if u not in seen:
                 seen.add(u)
